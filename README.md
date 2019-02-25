@@ -12,7 +12,7 @@ Hello, just few test with Twitch API
 {
     "CHANNEL": "#twitchchannelname",
     "USERNAME": "twitchusername",
-    "PASSL": "oauth:123456789mypassword."
+    "PASS": "oauth:123456789mypassword."
 }
 ```
 
