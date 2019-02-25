@@ -1,102 +1,125 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
+	"crypto/tls"
 	"fmt"
 	"net"
+	"strings"
+	"time"
+
+	"github.com/mitchellh/mapstructure"
+	"github.com/spf13/viper"
 )
 
-// type Channel struct {
-// 	ID          int    `json:"_id"`
-// 	DisplayName string `json:"display_name"`
-// 	Followers   int    `json:"followers"`
-// 	Views       int    `json:"views"`
-// }
+type twitchLine struct {
+	Badges      map[string]bool `mapstructure:"@badges"`
+	Color       string          `mapstructure:"color"`
+	DisplayName string          `mapstructure:"display-name"`
+	Emotes      string          `mapstructure:"emotes"`
+	Flags       string          `mapstructure:"flags"`
+	ID          string          `mapstructure:"id"`
+	Mod         string          `mapstructure:"mod"`
+	RoomID      string          `mapstructure:"room-id"`
+	Subscriber  string          `mapstructure:"subscriber"`
+	Timestamp   int64           `mapstructure:"tmi-sent-ts"`
+	Turbo       int             `mapstructure:"turbo"`
+	UserID      int             `mapstructure:"user-id"`
+	UserType    string          `mapstructure:"user-type"`
+	Message     string          `mapstructure:"message"`
+}
 
-// type Streams struct {
-// 	ID      int     `json:"_id"`
-// 	Game    string  `json:"game"`
-// 	Viewers int     `json:"viewers"`
-// 	Channel Channel `json:"channel"`
-// }
+func getMessage(message string, CHANNEL string) string {
+	// Bytes to removes the first part of the message.
+	var b = []byte(message)
+	b = b[bytes.IndexRune(b, '#'):]
 
-// type TwitchResponse struct {
-// 	Total   int       `json:"_total"`
-// 	Streams []Streams `json:"streams"`
-// }
-
-// type Client struct {
-// 	httpClient *http.Client
-// }
-
-// func NewClient(httpClient *http.Client) *Client {
-// 	if httpClient == nil {
-// 		httpClient = http.DefaultClient
-// 	}
-// 	c := &Client{httpClient: httpClient}
-
-// 	return c
-// }
-
-// func (c *Client) newRequest(method, path string, body interface{}) (*http.Request, error) {
-// 	var buf io.ReadWriter
-// 	if body != nil {
-// 		buf = new(bytes.Buffer)
-// 		err := json.NewEncoder(buf).Encode(body)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 	}
-// 	req, err := http.NewRequest(method, baseURL+path, buf)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	req.Header.Set("Client-ID", clientID)
-// 	// req.Header.Set("Authorization:", token)
-// 	return req, nil
-// }
-
-// func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
-// 	resp, err := c.httpClient.Do(req)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	defer resp.Body.Close()
-// 	err = json.NewDecoder(resp.Body).Decode(v)
-// 	return resp, err
-// }
-
-// func main() {
-// 	cl := NewClient(nil)
-// 	r, err := cl.newRequest("GET", "amouranth", nil)
-// 	if err != nil {
-// 		fmt.Println("Error here : " + err.Error())
-// 		return
-// 	}
-
-// 	rjson := TwitchResponse{}
-// 	_, err = cl.do(r, &rjson)
-// 	if err != nil {
-// 		fmt.Println("Error here too : " + err.Error())
-// 		return
-// 	}
-
-// 	for _, s := range rjson.Streams {
-// 		fmt.Println(s.Viewers)
-// 		fmt.Println(s.Game)
-// 		fmt.Println(s.ID)
-// 	}
-// }
+	return strings.TrimPrefix(string(b), CHANNEL)
+}
 
 func main() {
+
+	// Get ViperConfig ( IMPROVE )
+	viper.SetConfigName("config")
+	viper.AddConfigPath("$HOME/.twitchIRC")
+	viper.AddConfigPath(".")
+	err := viper.ReadInConfig()
+	if err != nil {
+		panic(fmt.Errorf("fatal error config file: %s \n", err))
+	}
+
+	// GET INFO inside config.json
+	CHANNEL := viper.GetString("CHANNEL")
+	PASS := viper.GetString("PASS")
+	USERNAME := viper.GetString("USERNAME")
+
 	var conn net.Conn
-	var err error
 
-	conn, err = net.Dial("tcp", "irc.chat.twitch.tv:6667")
+	dialer := &net.Dialer{
+		KeepAlive: time.Second * 10,
+	}
 
+	conn, err = tls.DialWithDialer(dialer, "tcp", "irc.chat.twitch.tv:443", &tls.Config{})
 	if err != nil {
 		fmt.Println("ERROR: " + err.Error())
 		return
 	}
 
-	fmt.Println(conn)
+	conn.Write([]byte("PASS " + PASS + "\r\n"))
+	conn.Write([]byte("NICK " + USERNAME + "\r\n"))
+	conn.Write([]byte("CAP REQ :twitch.tv/tags\r\n"))
+	// conn.Write([]byte("CAP REQ :twitch.tv/commands\r\n"))
+	conn.Write([]byte("JOIN " + CHANNEL + "\r\n"))
+
+	onComma := func(data []byte, atEOF bool) (advance int, token []byte, err error) {
+		for i := 0; i < len(data); i++ {
+			if data[i] == ';' {
+				return i + 1, data[:i], nil
+			}
+		}
+
+		return 0, data, bufio.ErrFinalToken
+	}
+
+	for {
+		line, err := bufio.NewReader(conn).ReadString('\n')
+		if err != nil {
+			fmt.Println("ERROR readline: " + err.Error())
+			return
+		}
+
+		scanner := bufio.NewScanner(strings.NewReader(line))
+		scanner.Split(onComma)
+
+		twl := twitchLine{}
+		// Initial declaration
+		m := map[string]string{}
+
+		for scanner.Scan() {
+			l := scanner.Text()
+
+			if strings.Contains(l, "=") {
+				split := strings.Split(l, "=")
+
+				m[split[0]] = split[1]
+			} else {
+				fmt.Println(l)
+			}
+		}
+
+		if m["user-id"] != "" {
+			if m["user-type"] != "" {
+				s := strings.SplitN(m["user-type"], ":", 2)
+
+				m["message"] = s[1]
+				m["user-type"] = s[0]
+			}
+			mapstructure.Decode(m, &twl)
+			message := strings.Replace(m["message"], strings.ToLower(twl.DisplayName)+`!`+strings.ToLower(twl.DisplayName)+`@`+strings.ToLower(twl.DisplayName)+` .tmi.twitch.tv PRIVMSG`+CHANNEL, "", -1)
+
+			fmt.Printf(twl.DisplayName + ": " + getMessage(message, CHANNEL))
+		}
+	}
+
 }
