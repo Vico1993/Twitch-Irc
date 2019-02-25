@@ -7,6 +7,15 @@ Hello, just few test with Twitch API
     - `USERNAME` your twitch username
     - `PASS` your twitch [oauth token](https://twitchapps.com/tmi/) 
 
+### Example
+```
+{
+    "CHANNEL": "#twitchchannelname",
+    "USERNAME": "twitchusername",
+    "PASSL": "oauth:123456789mypassword."
+}
+```
+
 ## TODO:
 - Import Color into the Terminal
 - Import Emoji ?
