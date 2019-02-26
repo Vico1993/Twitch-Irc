@@ -18,5 +18,7 @@ Hello, just few test with Twitch API
 
 ## TODO:
 - Import Color into the Terminal
-- Import Emoji ?
+- Import Emoji / icons twitch ?
 - Timestamp
+- Show link( specific color )
+- Show Moderator / VIP people ( Bagdges? specific icons... )
