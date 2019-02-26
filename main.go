@@ -99,6 +99,12 @@ func main() {
 		for scanner.Scan() {
 			l := scanner.Text()
 
+			// If twitch send US PING need to reply. PONG
+			if strings.Contains(l, "PING") {
+				pong := strings.Replace(l, "PING", "PONG", 1)
+				conn.Write([]byte(pong + "\r\n"))
+			}
+
 			if strings.Contains(l, "=") {
 				split := strings.Split(l, "=")
 
