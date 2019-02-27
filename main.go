@@ -110,7 +110,7 @@ func main() {
 
 				m[split[0]] = split[1]
 			} else {
-				fmt.Println(l)
+				fmt.Printf(l)
 			}
 		}
 
@@ -125,6 +125,13 @@ func main() {
 			message := strings.Replace(m["message"], strings.ToLower(twl.DisplayName)+`!`+strings.ToLower(twl.DisplayName)+`@`+strings.ToLower(twl.DisplayName)+` .tmi.twitch.tv PRIVMSG`+CHANNEL, "", -1)
 
 			fmt.Printf(twl.DisplayName + ": " + getMessage(message, CHANNEL))
+			fmt.Println("- - - - - - - - - - - - - - - - - - - - - -")
+			fmt.Println("Color :" + twl.Color)
+			fmt.Println("DisplayName :" + twl.DisplayName)
+			fmt.Println("Emotes :" + twl.Emotes)
+			fmt.Println("Mod :" + twl.Mod)
+			fmt.Println("User - Type :" + twl.UserType)
+			fmt.Println("- - - - - - - - - - - - - - - - - - - - - -")
 		}
 	}
 
